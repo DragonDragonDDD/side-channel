@@ -2,17 +2,21 @@
 
 var $TypeError = require('es-errors/type');
 var inspect = require('object-inspect');
-var getSideChannelList = require('side-channel-list');
-var getSideChannelMap = require('side-channel-map');
-var getSideChannelWeakMap = require('side-channel-weakmap');
+// Preserve initialization of the public backends before loading the shared storage.
+require('side-channel-list');
+require('side-channel-map');
+require('side-channel-weakmap');
+var getStorage = require('./storage');
 
-var makeChannel = getSideChannelWeakMap || getSideChannelMap || getSideChannelList;
-
-/** @type {import('.')} */
+/**
+ * @template K, V
+ * @returns {{ assert: (key: K) => void, 'delete': (key: K) => boolean, get: (key: K) => V | undefined, has: (key: K) => boolean, set: (key: K, value: V) => void }}
+ */
 module.exports = function getSideChannel() {
-	/** @typedef {ReturnType<typeof getSideChannel>} Channel */
+	/** @typedef {{ assert: (key: K) => void, 'delete': (key: K) => boolean, get: (key: K) => V | undefined, has: (key: K) => boolean, set: (key: K, value: V) => void }} Channel */
 
-	/** @type {Channel | undefined} */ var $channelData;
+	/** @type {{ 'delete': (key: K) => boolean, get: (key: K) => V | undefined, has: (key: K) => boolean, set: (key: K, value: V) => void }} */
+	var storage = getStorage();
 
 	/** @type {Channel} */
 	var channel = {
@@ -24,22 +28,10 @@ module.exports = function getSideChannel() {
 				throw new $TypeError('Side channel does not contain ' + keyDesc);
 			}
 		},
-		'delete': function (key) {
-			return !!$channelData && $channelData['delete'](key);
-		},
-		get: function (key) {
-			return $channelData && $channelData.get(key);
-		},
-		has: function (key) {
-			return !!$channelData && $channelData.has(key);
-		},
-		set: function (key, value) {
-			if (!$channelData) {
-				$channelData = makeChannel();
-			}
-
-			$channelData.set(key, value);
-		}
+		'delete': storage['delete'],
+		get: storage.get,
+		has: storage.has,
+		set: storage.set
 	};
 
 	return channel;
